@@ -143,3 +143,11 @@ contract ComptrollerV5Storage is ComptrollerV4Storage {
     /// @notice Last block at which a contributor's COMP rewards have been allocated
     mapping(address => uint) public lastContributorBlock;
 }
+
+contract ComptrollerV6Storage is ComptrollerV5Storage {
+    // The address of the COMP token
+    address public compAddress;
+
+    mapping(address => bool) public supplyWhitelist;
+    mapping(address => address) public liquidateWhitelist;
+}

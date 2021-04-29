@@ -12,7 +12,7 @@ import "./Governance/Comp.sol";
  * @title Compound's Comptroller Contract
  * @author Compound
  */
-contract Comptroller is ComptrollerV5Storage, ComptrollerInterface, ComptrollerErrorReporter, ExponentialNoError {
+contract Comptroller is ComptrollerV6Storage, ComptrollerInterface, ComptrollerErrorReporter, ExponentialNoError {
     /// @notice Emitted when an admin supports a market
     event MarketListed(CToken cToken);
 
@@ -109,6 +109,8 @@ contract Comptroller is ComptrollerV5Storage, ComptrollerInterface, ComptrollerE
      * @return Success indicator for whether each corresponding market was entered
      */
     function enterMarkets(address[] memory cTokens) public returns (uint[] memory) {
+        require(supplyWhitelist[msg.sender], "enter market is unauthorized");
+
         uint len = cTokens.length;
 
         uint[] memory results = new uint[](len);
@@ -222,11 +224,12 @@ contract Comptroller is ComptrollerV5Storage, ComptrollerInterface, ComptrollerE
      * @return 0 if the mint is allowed, otherwise a semi-opaque error code (See ErrorReporter.sol)
      */
     function mintAllowed(address cToken, address minter, uint mintAmount) external returns (uint) {
+        require(supplyWhitelist[minter], "mint is unauthorized");
+
         // Pausing is a very serious situation - we revert to sound the alarms
         require(!mintGuardianPaused[cToken], "mint is paused");
 
         // Shh - currently unused
-        minter;
         mintAmount;
 
         if (!markets[cToken].isListed) {
@@ -328,6 +331,8 @@ contract Comptroller is ComptrollerV5Storage, ComptrollerInterface, ComptrollerE
      * @return 0 if the borrow is allowed, otherwise a semi-opaque error code (See ErrorReporter.sol)
      */
     function borrowAllowed(address cToken, address borrower, uint borrowAmount) external returns (uint) {
+        require(supplyWhitelist[borrower], "borrow is unauthorized");
+
         // Pausing is a very serious situation - we revert to sound the alarms
         require(!borrowGuardianPaused[cToken], "borrow is paused");
 
@@ -410,9 +415,11 @@ contract Comptroller is ComptrollerV5Storage, ComptrollerInterface, ComptrollerE
         address borrower,
         uint repayAmount) external returns (uint) {
         // Shh - currently unused
-        payer;
-        borrower;
         repayAmount;
+
+        if (liquidateWhitelist[borrower] != address(0)) {
+            require(liquidateWhitelist[borrower] == payer, "payer is unauthorized");
+        }
 
         if (!markets[cToken].isListed) {
             return uint(Error.MARKET_NOT_LISTED);
@@ -466,8 +473,10 @@ contract Comptroller is ComptrollerV5Storage, ComptrollerInterface, ComptrollerE
         address liquidator,
         address borrower,
         uint repayAmount) external returns (uint) {
-        // Shh - currently unused
-        liquidator;
+
+        if (liquidateWhitelist[borrower] != address(0)) {
+            require(liquidateWhitelist[borrower] == liquidator, "liquidate is unauthorized");
+        }
 
         if (!markets[cTokenBorrowed].isListed || !markets[cTokenCollateral].isListed) {
             return uint(Error.MARKET_NOT_LISTED);
@@ -537,6 +546,10 @@ contract Comptroller is ComptrollerV5Storage, ComptrollerInterface, ComptrollerE
         uint seizeTokens) external returns (uint) {
         // Pausing is a very serious situation - we revert to sound the alarms
         require(!seizeGuardianPaused, "seize is paused");
+
+        if (liquidateWhitelist[borrower] != address(0)) {
+            require(liquidateWhitelist[borrower] == liquidator, "seize is unauthorized");
+        }
 
         // Shh - currently unused
         seizeTokens;
@@ -949,7 +962,7 @@ contract Comptroller is ComptrollerV5Storage, ComptrollerInterface, ComptrollerE
       * @param newBorrowCaps The new borrow cap values in underlying to be set. A value of 0 corresponds to unlimited borrowing.
       */
     function _setMarketBorrowCaps(CToken[] calldata cTokens, uint[] calldata newBorrowCaps) external {
-    	require(msg.sender == admin || msg.sender == borrowCapGuardian, "only admin or borrow cap guardian can set borrow caps"); 
+        require(msg.sender == admin || msg.sender == borrowCapGuardian, "only admin or borrow cap guardian can set borrow caps");
 
         uint numMarkets = cTokens.length;
         uint numBorrowCaps = newBorrowCaps.length;
@@ -1255,7 +1268,7 @@ contract Comptroller is ComptrollerV5Storage, ComptrollerInterface, ComptrollerE
      * @return The amount of COMP which was NOT transferred to the user
      */
     function grantCompInternal(address user, uint amount) internal returns (uint) {
-        Comp comp = Comp(getCompAddress());
+        Comp comp = Comp(compAddress);
         uint compRemaining = comp.balanceOf(address(this));
         if (amount > 0 && amount <= compRemaining) {
             comp.transfer(user, amount);
@@ -1311,6 +1324,36 @@ contract Comptroller is ComptrollerV5Storage, ComptrollerInterface, ComptrollerE
     }
 
     /**
+     * @notice Set supply whitelist
+     * @param supplier The supplier whose supply assets
+     * @param status enable or disable
+     */
+    function _setSupplyWhitlist(address supplier, bool status) public {
+        require(adminOrInitializing(), "only admin can set whitelist");
+        supplyWhitelist[supplier] = status;
+    }
+
+    /**
+     * @notice Set liquidation whitelist
+     * @param borrower The address of the borrower to liquidated
+     * @param liquidator The liquidator whose liquidate borrower debt
+     */
+    function _setLiquidateWhitlist(address borrower, address liquidator) public {
+        require(adminOrInitializing(), "only admin can set whitelist");
+        liquidateWhitelist[borrower] = liquidator;
+    }
+
+    /**
+     * @notice Set the address of the COMP token
+     * @param comp The address of COMP
+     */
+    function _setCompAddress(address comp) public {
+        require(adminOrInitializing(), "only admin can set whitelist");
+        require(comp != address(0), "zero address");
+        compAddress = comp;
+    }
+
+    /**
      * @notice Return all of the markets
      * @dev The automatic getter may be used to access an individual market.
      * @return The list of market addresses
@@ -1321,13 +1364,5 @@ contract Comptroller is ComptrollerV5Storage, ComptrollerInterface, ComptrollerE
 
     function getBlockNumber() public view returns (uint) {
         return block.number;
-    }
-
-    /**
-     * @notice Return the address of the COMP token
-     * @return The address of COMP
-     */
-    function getCompAddress() public view returns (address) {
-        return 0xc00e94Cb662C3520282E6f5717214004A7f26888;
     }
 }
