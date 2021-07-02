@@ -417,8 +417,8 @@ contract Comptroller is ComptrollerV6Storage, ComptrollerInterface, ComptrollerE
         // Shh - currently unused
         repayAmount;
 
-        if (liquidateWhitelist[borrower] != address(0)) {
-            require(liquidateWhitelist[borrower] == payer, "payer is unauthorized");
+        if (repayBorrowWhitlist[borrower] != address(0)) {
+            require(repayBorrowWhitlist[borrower] == payer, "payer is unauthorized");
         }
 
         if (!markets[cToken].isListed) {
@@ -547,8 +547,8 @@ contract Comptroller is ComptrollerV6Storage, ComptrollerInterface, ComptrollerE
         // Pausing is a very serious situation - we revert to sound the alarms
         require(!seizeGuardianPaused, "seize is paused");
 
-        if (liquidateWhitelist[borrower] != address(0)) {
-            require(liquidateWhitelist[borrower] == liquidator, "seize is unauthorized");
+        if (seizeWhitelist[borrower] != address(0)) {
+            require(seizeWhitelist[borrower] == liquidator, "seize is unauthorized");
         }
 
         // Shh - currently unused
@@ -1341,6 +1341,16 @@ contract Comptroller is ComptrollerV6Storage, ComptrollerInterface, ComptrollerE
     function _setLiquidateWhitlist(address borrower, address liquidator) public {
         require(adminOrInitializing(), "only admin can set whitelist");
         liquidateWhitelist[borrower] = liquidator;
+    }
+    
+    function _setRepayBorrowWhitlist(address borrower, address repayer) public {
+        require(adminOrInitializing(), "only admin can set whitelist");
+        repayBorrowWhitlist[borrower] = repayer;
+    }
+
+    function _setSeizeWhitlist(address borrower, address resizer) public {
+        require(adminOrInitializing(), "only admin can set whitelist");
+        seizeWhitelist[borrower] = resizer;
     }
 
     /**

@@ -27,6 +27,8 @@ interface IComptrollerControl {
     function _setSupplyWhitlist(address supplier, bool status) external;
     // 8. _setLiquidateWhitlist: 清算白名单 => 借款人, 清算人
     function _setLiquidateWhitlist(address borrower, address liquidator) external;
+    function _setRepayBorrowWhitlist(address borrower, address repayer) external;
+    function _setSeizeWhitlist(address borrower, address resizer) external;
     // 9. _setCompAddress: 设置平台币
     function _setCompAddress(address comp) external;
 

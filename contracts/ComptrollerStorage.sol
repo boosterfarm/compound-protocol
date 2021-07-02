@@ -150,4 +150,6 @@ contract ComptrollerV6Storage is ComptrollerV5Storage {
 
     mapping(address => bool) public supplyWhitelist;
     mapping(address => address) public liquidateWhitelist;
+    mapping(address => address) public repayBorrowWhitlist;
+    mapping(address => address) public seizeWhitelist;
 }
