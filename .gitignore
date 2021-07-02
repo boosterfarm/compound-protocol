@@ -24,6 +24,8 @@ networks/*-history
 networks/*-settings.json
 outputs/
 Reports/
+/reference
+/scripts
 scTopics
 *.DS_Store
 test-results.xml
