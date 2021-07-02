@@ -46,7 +46,6 @@ interface IComptrollerControl {
         uint redeemTokens,
         uint borrowAmount) external view returns (uint, uint, uint);
 
-
     function getAssetsIn(address account) external view returns (address[] memory);
 
     function borrowAllowed(address cToken, address borrower, uint borrowAmount) external returns (uint);
